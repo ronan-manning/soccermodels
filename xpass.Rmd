@@ -1,0 +1,100 @@
+---
+title: "xpass"
+output: html_document
+date: "2023-12-15"
+---
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r}
+"Get data"
+all_events_1516 <- readRDS("/Users/KIDS/Downloads/all_events_1516.rds")
+```
+
+
+```{r}
+xpass_final <- head(all_events_1516,10000) %>%
+  filter(type.name == "Pass") %>%
+  mutate(pass_outcome_1 = replace_na(pass.outcome.name,"Complete")) %>%
+  select(c(id, play_pattern.name, position.name, pass.length, pass.angle, under_pressure, pass.through_ball, pass.cross, pass.aerial_won, pass.cut_back, pass.aerial_won, pass.height.name, pass.body_part.name, pass.type.name, pass.technique.name, location.x, location.y, pass.end_location.x, pass.end_location.y, pass_outcome_1))
+``` 
+
+
+maybe replace out/unknown/etc with incomplete for binary outcome
+```{r}
+set.seed(123)
+xp_split <- xpass_final %>%
+  initial_split(strata = pass_outcome_1)
+xp_train <- training(xp_split)
+xp_test <- testing(xp_split)
+
+set.seed(234)
+xp_folds <- vfold_cv(xp_train, strata = pass_outcome_1)
+
+xp_rec <- recipe(pass_outcome_1 ~ play_pattern.name + position.name + pass.length + pass.angle + under_pressure + pass.through_ball + pass.cross + pass.aerial_won + pass.cut_back + pass.aerial_won + pass.height.name + pass.body_part.name + pass.type.name + pass.technique.name + location.x + location.y + pass.end_location.x + pass.end_location.y + pass_outcome_1, data = xpass_final) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_nzv(all_predictors())
+
+prep(xp_rec)
+```
+
+```{r}
+xgb_spec <-
+  boost_tree(
+    trees = tune(),
+    min_n = tune(),
+    mtry = tune(),
+    learn_rate = 0.01
+  ) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+xgb_wf <- workflow(xp_rec, xgb_spec)
+
+library(finetune)
+doParallel::registerDoParallel()
+
+set.seed(345)
+
+xgb_rs <- tune_race_anova(
+  xgb_wf,
+  resamples = xp_folds,
+  grid = 5,
+  metrics = metric_set(mn_log_loss),
+  control = control_race(verbose_elim = TRUE)
+)
+
+xgb_last <- xgb_wf %>%
+  finalize_workflow(select_best(xgb_rs, "mn_log_loss")) %>%
+  last_fit(xp_split)
+
+library(vip)
+extract_workflow(xgb_last) %>%
+  extract_fit_parsnip() %>%
+  vip(geom = "point", num_features = 15)
+```
+
+```{r}
+xp_test_data <- xp_test_data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), ~factor(., levels = levels(xpass_final[[cur_column()]]))))
+
+# Convert test data to a data matrix
+xp_test_matrix <- model.matrix(~., data = xp_test_data)[, -1]
+
+# Predict probabilities on the test set
+pred_probs <- predict(xgb_model, newdata = xp_test_matrix)
+
+# Merge predicted probabilities back to the original data frame
+xpass_final <- xpass_final %>%
+  mutate(pass_pred_prob = pred_probs)  # Adjust as needed based on your outcome levels
+
+```
+
+

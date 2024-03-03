@@ -1,0 +1,282 @@
+---
+title: "gplus_model"
+output: html_document
+date: "2023-12-13"
+---
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r}
+"Get data"
+all_events_1516 <- readRDS("/Users/KIDS/Downloads/all_events_1516.rds")
+```
+
+NEXT STEPS:
+
+ - create new all_events df with only meaningful predictors
+    - create necessary cols like prior pass longball/cross/etc binaries
+    - delete things as needed (e.g. maybe merge receipt into pass)
+ - xgboost it
+ 
+ Maybe keep ball receipts in  but ensure pass g+ isn't double counted in total calculation
+  - Or find a good way to split g+ for passes between passer and receiver (xpass)
+ 
+Make a list of things that shouldn't be counted in event count and implement function to not count them
+  - Think about whether ball receipts should be events (ask asa?)]
+
+```{r}
+gplus <- all_events_1516
+```
+
+```{r}
+#Merge pass + receipt rows, receiver becomes the playername of the receipt (if conditions met)
+"BELOW CHUNK NOT DONE"
+gplus$pass_receipt_outcome <- NA
+
+"BELOW CHUNK DONE"
+gplus$action_num <- NA #N, where this is the Nth event of the possession
+gplus$this_header <- NA #T/F for this being a header
+
+"BELOW CHUNK NOT DONE"
+gplus$prior_action <- NA #Type of last action #Figure out filtering out receipts before/after so this works
+gplus$prior_long <- NA #T/F for prior action being a long ball
+gplus$prior_cross <- NA #T/F for prior action being a cross
+gplus$prior_through <- NA #T/F for prior action being a through ball
+
+"BELOW CHUNK DONE"
+gplus$this_kickoff <- NA #T/F for this action being a kickoff 
+gplus$since_kickoff <- NA #Actions since kickoff (maybe cap this)
+gplus$this_corner <- NA #T/F for this action being a corner
+gplus$since_corner <- NA #Actions since corner (maybe cap this)
+gplus$this_throw <- NA #T/F for this action being a throw
+gplus$since_throw <- NA #Actions since throw (maybe cap this)
+gplus$this_fk <- NA #T/F for this action being a free kick
+gplus$since_fk <- NA #Actions since free kick (maybe cap this)
+gplus$this_gk <- NA #T/F for this action being a goal kick
+gplus$since_gk <- NA #Actions since goal kick (maybe cap this)
+
+"BELOW CHUNK NOT DONE "
+gplus$vert_vel <- NA #field length distance covered in last 4 actions (or less if not 4 actions yet, use action_num) divided by time
+gplus$horiz_vel <- NA #field width distance covered in last 2 actions (or less if not 2 actions yet, use action_num) divided by time
+
+
+
+
+since_kickoff = 1 #kickoff set at 1 since loop starts at 2
+since_corner = NA
+since_throw = NA
+since_fk = NA
+since_gk = NA
+
+match_count = 0
+
+for(i in 1:nrow(gplus)) { #First loop to merge receipts and passes (and anything else)
+  if(gplus$type.name[i] == "Pass" & gplus$type.name[i+1] == "Ball Receipt*" & gplus$team.name[i] == gplus$team.name[i+1] & gplus$period[i] == gplus$period[i+1]) { #this doesn't work because filtered out receipts
+    gplus$pass_receipt_outcome[i] = gplus$ball_receipt.outcome.name[i+1]
+  }
+}
+
+#"standalone" events
+valid_events <- list("Ball Recovery", "Carry", "Clearance", "Dispossessed", "Dribble", "Duel", "Foul Committed", "Goal Keeper", "Interception", "Miscontrol", "Pass", "Offside", "Shot")
+
+gplus <- gplus %>% #filter out receipts + whatever else
+  filter(type.name %in% valid_events) #make sure all events that interrupt possession string are out - maybe only do passes to test
+
+half_count = 0
+
+for(i in 2:nrow(gplus)) { #Second loop to define other variables once event structure is set
+  
+  gplus$prior_action[i] = gplus$type.name[i-1]
+  
+  if(gplus$pass.cross[i-1] %in% c(TRUE)) { #prior cross
+    gplus$prior_cross[i] == TRUE
+  }
+  
+  if(gplus$pass.through_ball[i-1] %in% c(TRUE)) { #prior cross
+    gplus$prior_through[i] == TRUE
+  }
+  
+  if(!is.na(gplus$pass.length[i-1]) & gplus$pass.length[i-1] > 30 & gplus$pass.height.name %in% c("Low Pass", "High Pass")) { #long ball definition - revise if needed
+    gplus$prior_long == TRUE
+  }
+  
+  if(gplus$possession[i] == gplus$possession[i-1] & gplus$team.name[i] == gplus$team.name[i-1]) { #Small thing but check if using ID instead of name is faster #Also reintroduce ball receipt checks here if they come back into DF
+    gplus$action_num[i] = counter + 1
+    counter = counter + 1
+  }
+  else {
+    counter = 0
+  }
+  
+  gplus$this_kickoff[i] = (gplus$pass.type.name[i] == "Kick Off")
+  gplus$this_corner[i] = (gplus$pass.type.name[i] == "Corner")
+  gplus$this_throw[i] = (gplus$pass.type.name[i] == "Throw-in") 
+  gplus$this_fk[i] = (gplus$pass.type.name[i] == "Free Kick")
+  gplus$this_gk[i] = (gplus$pass.type.name[i] == "Goal Kick")
+  
+  if ("Head" %in% c(gplus$pass.body_part.name[i], gplus$shot.body_part.name[i], gplus$clearance.body_part.name[i])) {
+ #this_header
+      gplus$this_header[i] = TRUE
+  }
+  else {
+    gplus$this_header[i] = FALSE
+  }
+
+# think about whether to differentiate between which team had the set piece/event and if it matters or if it'll work out with data magic
+  
+  if(gplus$period[i] != gplus$period[i-1]) { #reset since_event counters (to NA/default)  for each match/half
+    since_kickoff = 1
+    since_corner = NA
+    since_throw = NA
+    since_fk = NA
+    since_gk = NA
+    half_count = 0
+  }
+  else {
+    half_count = half_count + 1
+  }
+  
+  
+  if(half_count > 4) { #vert_vel
+    gplus$vert_vel[i] = (gplus$location.x[i] - gplus$location.x[i-4])/4
+  }
+  else if(half_count <= 1) {
+    gplus$vert_vel[i] = 0
+  }
+  else { 
+    gplus$vert_vel[i] = (gplus$location.x[i] - gplus$location.x[i-half_count])/half_count
+  }
+  
+  if(half_count > 2) { #vert_vel
+    gplus$horiz_vel[i] = (gplus$location.y[i] - gplus$location.y[i-2])/2
+  }
+  else if(half_count <= 1) {
+    gplus$horiz_vel[i] = 0
+  }
+  else { 
+    gplus$horiz_vel[i] = (gplus$location.x[i] - gplus$location.x[i-half_count])/half_count #triple check this when not tired - exact numbers maybe iffy
+    }
+  
+  if (gplus$pass.type.name[i] %in% c("Kick Off")) { #reset since_event counters to 0 when that event happens
+    since_kickoff = 0
+  }
+  else if(!is.na(since_kickoff)) { #if this event isn't specified event type, increment counter (unless NA in case that event hasn't occurred yet)
+    since_kickoff = since_kickoff + 1
+  }
+  gplus$since_kickoff[i] = since_kickoff
+
+  
+  if (gplus$pass.type.name[i] %in% c("Corner")) {
+    since_corner = 0
+  }
+  else if(!is.na(since_corner)) { 
+    since_corner = since_corner + 1
+  }
+  gplus$since_corner[i] = since_corner
+  
+  
+  if (gplus$pass.type.name[i] %in% c("Throw-in")) {
+    since_throw = 0
+  }
+  else if(!is.na(since_throw)) {
+    since_throw = since_throw + 1
+  }
+  gplus$since_throw[i] = since_throw
+  
+  
+  if (gplus$pass.type.name[i] %in% c("Free Kick")) {
+    since_fk = 0
+  }
+  else if(!is.na(since_fk)) {
+    since_fk = since_fk + 1
+  }
+  gplus$since_fk[i] = since_fk
+  
+  
+  if (gplus$pass.type.name[i] %in% c("Goal Kick")) {
+    since_gk = 0
+  }
+  else if(!is.na(since_gk)) {
+    since_gk = since_gk + 1
+  }
+  gplus$since_gk[i] = since_gk
+
+    #valid events (again, nail down which events count) since kickoff #or maybe go off seconds passed? idk asa does events/actions, see what their valid events are
+
+}
+```
+
+
+```{r}
+gplus_final <- gplus %>%
+  select(c(action_num, this_header, prior_action, prior_long, prior_cross, prior_through, this_kickoff, since_kickoff,this_corner,since_corner,this_throw,since_throw,this_fk,since_fk,this_gk,since_gk,vert_vel,horiz_vel, shot.statsbomb_xg)) #pass_receipt_outcome not included
+```
+
+
+```{r}
+set.seed(123)
+
+gp_split <- gplus_final %>%
+  initial_split()
+
+gp_train <- training(gp_split)
+gp_test <- testing(gp_split)
+
+set.seed(234)
+
+gp_folds <- vfold_cv(gp_train)
+gp_folds
+
+gp_rec <- recipe(shot.statsbomb_xg ~ ., data = gp_train) %>%
+  step_unknown(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_nzv(all_predictors())
+
+## we can `prep()` just to check that it works
+prep(gp_rec)
+
+xgb_spec <- boost_tree(trees = tune(), min_n = tune(), mtry = tune(), learn_rate = 0.01) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+xgb_wf <- workflow(gp_rec, xgb_spec)
+
+library(finetune)
+doParallel::registerDoParallel()
+
+set.seed(345)
+xgb_rs <- tune_race_anova(
+  xgb_wf,
+  resamples = gp_folds,
+  grid = 15,
+  metrics = metric_set(mn_log_loss),
+  control = control_race(verbose_elim = TRUE)
+)
+
+xgb_last <- xgb_wf %>%
+  finalize_workflow(select_best(xgb_rs, "mn_log_loss")) %>%
+  last_fit(gp_split)
+
+library(vip)
+extract_workflow(xgb_last) %>%
+  extract_fit_parsnip() %>%
+  vip(geom = "point", num_features = 15)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

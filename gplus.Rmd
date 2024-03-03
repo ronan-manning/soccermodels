@@ -1,0 +1,678 @@
+---
+title: "gplus"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(devtools)
+library(ggplot2)
+library(remotes)
+library(SBpitch)
+library(StatsBombR)
+library(grid)
+library(data.table)
+library(tidyr)
+library(worldfootballR)
+```
+
+```{r}
+Comp <- FreeCompetitions()
+Matches <- FreeMatches(Comp)
+```
+
+```{r}
+"DO NOT USE"
+#matches_1516 <- Matches %>%
+  #filter(competition.competition_name == "1. Bundesliga" | competition.competition_name ==  "La Liga" | competition.competition_name == "Ligue 1" | competition.competition_name == "Serie A" | competition.competition_name == "Premier League") %>%
+  #filter(season.season_name == "2015/2016")
+```
+
+```{r}
+germany_matches_1516 <- Matches %>%
+  filter(competition.competition_name == "1. Bundesliga") %>%
+  filter(season.season_name == "2015/2016")
+
+germany_events_1516 <- free_allevents(MatchesDF = germany_matches_1516, Parallel = T)
+germany_events_1516 <- allclean(germany_events_1516)
+germany_events_1516 <- get.opposingteam(germany_events_1516)
+
+
+italy_matches_1516 <- Matches %>%
+  filter(competition.competition_name == "Serie A") %>%
+  filter(season.season_name == "2015/2016")
+
+italy_events_1516 <- free_allevents(MatchesDF = italy_matches_1516, Parallel = T)
+italy_events_1516 <- allclean(italy_events_1516)
+italy_events_1516 <- get.opposingteam(italy_events_1516)
+
+
+england_matches_1516 <- Matches %>%
+  filter(competition.competition_name == "Premier League") %>%
+  filter(season.season_name == "2015/2016")
+
+england_events_1516 <- free_allevents(MatchesDF = england_matches_1516, Parallel = T)
+england_events_1516 <- allclean(england_events_1516)
+england_events_1516 <- get.opposingteam(england_events_1516)
+
+spain_matches_1516 <- Matches %>%
+  filter(competition.competition_name == "La Liga") %>%
+  filter(season.season_name == "2015/2016")
+
+spain_events_1516 <- free_allevents(MatchesDF = spain_matches_1516, Parallel = T)
+spain_events_1516 <- allclean(spain_events_1516)
+spain_events_1516 <- get.opposingteam(spain_events_1516)
+
+france_matches_1516 <- Matches %>%
+  filter(competition.competition_name == "Ligue 1") %>%
+  filter(season.season_name == "2015/2016")
+
+france_events_1516 <- free_allevents(MatchesDF = france_matches_1516, Parallel = T)
+france_events_1516 <- allclean(france_events_1516)
+france_events_1516 <- get.opposingteam(france_events_1516)
+```
+
+```{r}
+# write.csv(all_events_1516,"/Users/KIDS/Downloads/1516_data_events.csv")
+# write.csv(germany_events_1516,"/Users/KIDS/Downloads/1516_germany_events.csv")
+# write.csv(italy_events_1516,"/Users/KIDS/Downloads/1516_italy_events.csv")
+# write.csv(england_events_1516,"/Users/KIDS/Downloads/1516_england_events.csv")
+# write.csv(spain_events_1516,"/Users/KIDS/Downloads/1516_spain_events.csv")
+# write.csv(france_events_1516,"/Users/KIDS/Downloads/1516_france_events.csv")
+```
+
+```{r}
+all_events_1516 <- bind_rows(germany_events_1516,spain_events_1516,england_events_1516,france_events_1516,italy_events_1516)
+
+all_events_1516 <- all_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+germany_events_1516 <- germany_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+england_events_1516 <- england_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+italy_events_1516 <- italy_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+france_events_1516 <- france_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+spain_events_1516 <- spain_events_1516 %>%
+  mutate(minsec = 60*minute + second)
+
+saveRDS(all_events_1516, "/Users/KIDS/Downloads/all_events_1516.rds")
+saveRDS(germany_events_1516, "/Users/KIDS/Downloads/germany_events_1516.rds")
+saveRDS(england_events_1516, "/Users/KIDS/Downloads/england_events_1516.rds")
+saveRDS(italy_events_1516, "/Users/KIDS/Downloads/italy_events_1516.rds")
+saveRDS(france_events_1516, "/Users/KIDS/Downloads/france_events_1516.rds")
+saveRDS(spain_events_1516, "/Users/KIDS/Downloads/spain_events_1516.rds")
+```
+
+```{r}
+"USE TO RESTORE"
+
+all_events_1516 <- readRDS("/Users/KIDS/Downloads/all_events_1516.rds")
+
+# germany_events_1516 <- readRDS("/Users/KIDS/Downloads/germany_events_1516.rds")
+# italy_events_1516 <- readRDS("/Users/KIDS/Downloads/italy_events_1516.rds")
+# england_events_1516 <- readRDS("/Users/KIDS/Downloads/england_events_1516.rds")
+# france_events_1516 <- readRDS("/Users/KIDS/Downloads/france_events_1516.rds")
+# spain_events_1516 <- readRDS("/Users/KIDS/Downloads/spain_events_1516.rds")
+```
+
+```{r}
+all_events_1516_selectcols <- all_events_1516 %>%
+  select(id,index,period,under_pressure,off_camera,type.name,possession,possession_team.name,team.name,pass.length,pass.angle,pass.cross,pass.cut_back,pass.recipient.name,pass.height.name,pass.body_part.name,pass.type.name,pass.outcome.name,pass.technique.name,ball_receipt.outcome.name,interception.outcome.name,shot.statsbomb_xg,duel.type.name,duel.outcome.name,dribble.outcome.name,clearance.body_part.name,match_id,foul_committed.type.name,location.x,location.y,minsec,carry.end_location.x,carry.end_location.y,pass.end_location.x,pass.end_location.y,OpposingTeam, StartOfPossession, TimeInPoss, TimeToPossEnd, position.name, match_id,pass.type.name,player.name)
+```
+
+```{r}
+head(all_events_1516,25)
+```
+
+NEXT STEPS:
+
+ - create new all_events df with only meaningful predictors
+    - create necessary cols like prior pass longball/cross/etc binaries
+    - delete things as needed (e.g. maybe merge receipt into pass)
+ - xgboost it
+ 
+ Maybe keep ball receipts in  but ensure pass g+ isn't double counted in total calculation
+  - Or find a good way to split g+ for passes between passer and receiver (xpass!!!)
+ 
+Make a list of things that shouldn't be counted in event count and implement function to not count them
+  - Think about whether ball receipts should be events (ask asa?)]
+
+
+```{r}
+table(all_events_1516$pass.body_part.name)
+print("x")
+table(all_events_1516$shot.body_part.name)
+print("x")
+table(all_events_1516$clearance.body_part.name)
+print("x")
+table(all_events_1516$goalkeeper.body_part.name)
+print("x")
+
+table(all_events_1516$type.name) #figure out which are "real" events - filter and merge accordingly to create a cohesive gplus df
+```
+
+```{r}
+"THROW INS"
+total_xg = 0
+total_shots = 0
+total_throws = 0
+
+for (x in 1:nrow(all_events_1516_selectcols)) {
+  
+   if(x %% 100000 == 0) {
+    print(100*x/nrow(all_events_1516_selectcols))
+   }
+  
+  pass_type_name <- all_events_1516_selectcols$pass.type.name[x]
+  location_x <- all_events_1516_selectcols$location.x[x]
+  off_camera <- all_events_1516_selectcols$off_camera[x]
+  
+  if (!is.na(pass_type_name) && !is.na(location_x) && is.na(off_camera)) {
+    if (pass_type_name == "Throw-in" && location_x > 80) {
+      total_throws = total_throws + 1
+      indiv_xg = 0
+      event_row = all_events_1516_selectcols[x, ]
+      
+      for (n in 1:30) {
+        next_idx <- x + n
+        if (next_idx <= nrow(all_events_1516_selectcols)) {
+          if (all_events_1516_selectcols$minsec[next_idx] < all_events_1516_selectcols$minsec[x] + 10 &&
+              all_events_1516_selectcols$match_id[next_idx] == all_events_1516_selectcols$match_id[x]) {
+            event_row <- rbind(event_row, all_events_1516_selectcols[next_idx, ])
+          }
+        }
+      }
+      
+      for (a in 1:nrow(event_row)) {
+        shot_xg <- event_row$shot.statsbomb_xg[a]
+        if (!is.na(shot_xg)) {
+          total_shots = total_shots + 1
+          total_xg = total_xg + shot_xg
+        }
+      }
+    }
+  }
+}
+
+cat("Throw-ins in final third: ", paste(total_throws), "\n")
+cat("Shots from these throw-ins: ", paste(total_shots), "\n")
+cat("xG per shot: ", paste(total_xg/total_shots), "\n")
+```
+
+```{r}
+"PASSES (COMPLETE (add this!), shots same team as passes - no conceded xg yet)"
+
+total_xg = 0
+total_shots = 0
+total_passes = 0
+
+#the box to be drawn around (x_start, y_start) with sides 2*radius_start - might be too rigid 
+x_start = 95
+y_start = 40
+radius_start = 5
+  
+x_end = 110
+y_end = 40
+radius_end = 5
+  
+for (x in 1:nrow(all_events_1516_selectcols)) {
+  
+   if(x %% 500000 == 0) {
+    print(100*x/nrow(all_events_1516_selectcols))
+   }
+  
+  pass_type_name <- all_events_1516_selectcols$pass.type.name[x]
+  location_x <- all_events_1516_selectcols$location.x[x]
+  location_y <- all_events_1516_selectcols$location.y[x]
+  end_location_x <- all_events_1516_selectcols$pass.end_location.x[x]
+  end_location_y <- all_events_1516_selectcols$pass.end_location.y[x]
+  off_camera <- all_events_1516_selectcols$off_camera[x]
+  
+  
+  if (!is.na(pass_type_name) && !is.na(location_x) && is.na(off_camera)) {
+    if (location_x > x_start - radius_start && location_x < x_start + radius_start & 
+        location_y > y_start - radius_start && location_y < y_start + radius_start &
+        end_location_x > x_end - radius_end && end_location_x < x_end + radius_end &
+        end_location_y > y_end - radius_end && end_location_y < y_end + radius_end) {
+      
+      total_passes = total_passes + 1
+      indiv_xg = 0
+      event_row = all_events_1516_selectcols[x, ]
+      
+      for (n in 1:30) {
+        next_idx <- x + n
+        if (next_idx <= nrow(all_events_1516_selectcols)) {
+          if (all_events_1516_selectcols$minsec[next_idx] < all_events_1516_selectcols$minsec[x] + 10 &&
+              all_events_1516_selectcols$match_id[next_idx] == all_events_1516_selectcols$match_id[x] &&
+              all_events_1516_selectcols$team.name[next_idx] == all_events_1516_selectcols$team.name[x]) {
+            event_row <- rbind(event_row, all_events_1516_selectcols[next_idx, ])
+          }
+        }
+      }
+      
+      for (a in 1:nrow(event_row)) {
+        shot_xg <- event_row$shot.statsbomb_xg[a]
+        if (!is.na(shot_xg)) {
+          total_shots = total_shots + 1
+          total_xg = total_xg + shot_xg
+        }
+      }
+    }
+  }
+}
+
+cat("Passes in range: ", paste(total_passes), "\n")
+cat("Shots within 10 seconds from these passes: ", paste(total_shots), "\n")
+cat("xG per shot: ", paste(total_xg/total_shots), "\n")
+cat("xG per pass: ", paste(total_xg/total_passes))
+```
+
+```{r}
+create_Pitch() +   
+  geom_rect(aes(xmin = x_start-radius_start, xmax = x_start+radius_start, ymin = y_start-radius_start, ymax = y_start+radius_start),
+            fill = "red", alpha = 0.3) +
+  geom_rect(aes(xmin = x_end-radius_end, xmax = x_end+radius_end, ymin = y_end-radius_end, ymax = y_end+radius_end),
+            fill = "red", alpha = 0.3) +
+  geom_point(aes(x=x_start,y=y_start)) + 
+  geom_segment(aes(x=x_start,y=y_start,xend=x_end,yend=y_end),alpha=0.75,arrow=arrow(length=unit(0.2,"cm"))) + 
+  theme(plot.title = element_text(size = 24, color = "black",family="sans",face="bold", hjust = 0.5,vjust=-2),
+        plot.subtitle = element_text(size = 12, color = "black", family = "sans", hjust = 0.5,vjust = -4),
+        plot.caption = element_text(size = 12, color = "black", family = "sans", hjust = 0.5,vjust = 4)) + 
+  scale_y_reverse() +
+  labs(title = paste("Shots per pass:", round(total_shots/total_passes,3)), 
+       subtitle = paste("xG per pass:", round(total_xg/total_passes,3), "|", "Passes:", total_passes), 
+       caption = "Caption")
+
+```
+
+
+```{r}
+"POSSESSION VALUE AT GIVEN (X,Y) - BALL RECEIPTS"
+
+total_xg_for = 0
+total_shots_for = 0
+
+total_xg_against = 0
+total_shots_against = 0
+
+total_receipts = 0
+
+x_receipt = 20
+y_receipt = 40
+radius_receipt = 5
+
+for (x in 1:nrow(all_events_1516_selectcols)) {
+  
+   if(x %% 1500000 == 0) {
+    print(100*x/nrow(all_events_1516_selectcols))
+   }
+  
+  location_x <- all_events_1516_selectcols$location.x[x]
+  location_y <- all_events_1516_selectcols$location.y[x]
+  off_camera <- all_events_1516_selectcols$off_camera[x]
+  type_name <- all_events_1516_selectcols$type.name[x]
+  poss_number <- all_events_1516_selectcols$possession[x] #easier references
+  team_for <- all_events_1516_selectcols$team.name[x]
+  team_against <- all_events_1516_selectcols$OpposingTeam[x]
+  
+  if (!is.na(location_x) && !is.na(location_y) && is.na(off_camera)) {
+    if (location_x > x_receipt - radius_receipt && location_x < x_receipt + radius_receipt & #if it's a ball receipt in the given area
+        location_y > y_receipt - radius_receipt && location_y < y_receipt + radius_receipt &
+        type_name == "Ball Receipt*") {
+      
+      total_receipts = total_receipts + 1
+      event_row = all_events_1516_selectcols[x, ]
+      
+      for (n in 1:30) { 
+        next_idx <- x + n
+        if (next_idx <= nrow(all_events_1516_selectcols)) {
+          if (all_events_1516_selectcols$minsec[next_idx] < all_events_1516_selectcols$minsec[x] + 60 && #less than a minute later 
+              all_events_1516_selectcols$match_id[next_idx] == all_events_1516_selectcols$match_id[x] && #same game
+              #all_events_1516_selectcols$team.name[next_idx] == all_events_1516_selectcols$team.name[x] && #same team
+              all_events_1516_selectcols$possession[next_idx] <= all_events_1516_selectcols$possession[x] + 1) { #same or next possession
+            event_row <- rbind(event_row, all_events_1516_selectcols[next_idx, ])
+          }
+        }
+      }
+      
+      for (a in 1:nrow(event_row)) {
+        shot_xg <- event_row$shot.statsbomb_xg[a]
+        if (!is.na(shot_xg)) {
+          if (event_row$team.name[a] == team_for) {
+            total_shots_for = total_shots_for + 1
+            total_xg_for = total_xg_for + shot_xg
+          }
+          else if (event_row$team.name[a] == team_against) {
+            total_shots_against = total_shots_against + 1
+            total_xg_against = total_xg_against + shot_xg
+          }
+        }
+      }
+    }
+  }
+}
+
+cat("Receipts: ", paste(total_receipts), "\n")
+cat("Shots for: ", paste(total_shots_for), "\n")
+cat("xG for: ", paste(total_xg_for), "\n")
+cat("Shots against: ", paste(total_shots_against), "\n")
+cat("xG against: ", paste(total_xg_against), "\n")
+```
+
+
+
+```{r}
+create_Pitch() +   
+  geom_rect(aes(xmin = x_receipt-radius_receipt, xmax = x_receipt+radius_receipt, ymin = y_receipt-radius_receipt, ymax = y_receipt+radius_receipt),
+            fill = "green", alpha = 0.3) +
+  theme(plot.title = element_text(size = 24, color = "black",family="sans",face="bold", hjust = 0.5,vjust=-2),
+        plot.subtitle = element_text(size = 12, color = "black", family = "sans", hjust = 0.5,vjust = -4),
+        plot.caption = element_text(size = 12, color = "black", family = "sans", hjust = 0.5,vjust = 4)) + 
+  scale_y_reverse() +
+  labs(title = paste("Possessions:", total_receipts), 
+       subtitle = paste("xG for per poss:", round(total_xg_for/total_receipts,5), "|", "xG against per poss:", round(total_xg_against/total_receipts,5)), 
+       caption = "Caption")
+```
+
+```{r}
+"PITCH_ZONES CREATION - DO NOT USE AGAIN!!!"
+
+y_min_prelim <- seq(0, 72, by = 8)
+y_min_list <- rep(y_min_prelim, 15)
+
+y_max_prelim <- seq(8, 80, by = 8)
+y_max_list <- rep(y_max_prelim, 15)
+
+x_min_prelim <- seq(0, 112, by = 8)
+x_min_list <- rep(x_min_prelim, each = 10)
+
+x_max_prelim <- seq(8, 120, by = 8)
+x_max_list <- rep(x_max_prelim, each = 10)
+
+labels_list <- seq(1,150, by = 1)
+
+#pitch_zones <- data.frame(
+#  zone_num = labels_list,
+#  x_min = x_min_list, 
+#  x_max = x_max_list,
+#  y_min = y_min_list, 
+#  y_max = y_max_list
+#)
+
+#pitch_zones$receipts <- NA
+#pitch_zones$xg_for <- NA
+#pitch_zones$xg_against <- NA
+#pitch_zones$shots_for <- NA
+#pitch_zones$shots_against <-NA
+```
+
+```{r}
+"TESTING VISUAL"
+zones_ref <- create_Pitch() + 
+  geom_rect(data = pitch_zones, aes(xmin = x_min, ymin = y_min, xmax = x_max, ymax = y_max, fill = xg_diff_per_rec), color = alpha("black", 0.3)) +
+  scale_fill_gradient2(low = alpha("red", 1), high = alpha("darkgreen", 1), mid = alpha("white", 0.3), midpoint = 0.015) + 
+  geom_text(data = pitch_zones, aes(x = (x_min + x_max) / 2, y = (y_min + y_max) / 2, label = zone_num), color = alpha("black",065), size = 3) +
+  theme_void() + 
+  scale_y_reverse()
+
+zones_ref
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+"RUNNING EACH SQUARE - DONE!"
+for (rownum in 1:nrow(pitch_zones)) {
+  
+  print(rownum)
+  
+  total_xg_for = 0
+  total_shots_for = 0
+
+  total_xg_against = 0
+  total_shots_against = 0
+
+  total_receipts = 0
+  
+  zone_xmin <- pitch_zones$x_min[rownum]
+  zone_xmax <- pitch_zones$x_max[rownum]
+  zone_ymin <- pitch_zones$y_min[rownum]
+  zone_ymax <- pitch_zones$y_max[rownum]
+  
+  for (x in 1:nrow(all_events_1516_selectcols)) {
+    
+  
+    location_x <- all_events_1516_selectcols$location.x[x]
+    location_y <- all_events_1516_selectcols$location.y[x]
+    off_camera <- all_events_1516_selectcols$off_camera[x]
+    type_name <- all_events_1516_selectcols$type.name[x]
+    poss_number <- all_events_1516_selectcols$possession[x] #easier references
+    team_for <- all_events_1516_selectcols$team.name[x]
+    team_against <- all_events_1516_selectcols$OpposingTeam[x]
+
+    if (!is.na(location_x) && !is.na(location_y) && is.na(off_camera)) {
+      if (location_x > zone_xmin && location_x < zone_xmax & #if it's a ball receipt in the given area
+          location_y > zone_ymin && location_y < zone_ymax &
+          type_name == "Ball Receipt*") {
+      
+        total_receipts = total_receipts + 1
+        event_row = all_events_1516_selectcols[x, ]
+      
+        for (n in 1:30) { 
+          next_idx <- x + n
+          if (next_idx <= nrow(all_events_1516_selectcols)) {
+            if (all_events_1516_selectcols$minsec[next_idx] < all_events_1516_selectcols$minsec[x] + 60 && #less than a minute later 
+                all_events_1516_selectcols$match_id[next_idx] == all_events_1516_selectcols$match_id[x] && #same game
+                #all_events_1516_selectcols$team.name[next_idx] == all_events_1516_selectcols$team.name[x] && #same team
+                all_events_1516_selectcols$possession[next_idx] <= all_events_1516_selectcols$possession[x] + 1) { #same or next possession
+              event_row <- rbind(event_row, all_events_1516_selectcols[next_idx, ])
+            }
+          }
+        }
+      
+        for (a in 1:nrow(event_row)) {
+          shot_xg <- event_row$shot.statsbomb_xg[a]
+          if (!is.na(shot_xg)) {
+            if (event_row$team.name[a] == team_for) {
+              total_shots_for = total_shots_for + 1
+              total_xg_for = total_xg_for + shot_xg
+            }
+            else if (event_row$team.name[a] == team_against) {
+              total_shots_against = total_shots_against + 1
+              total_xg_against = total_xg_against + shot_xg
+            }
+          }
+        }
+      }
+    }
+  }
+
+  cat("Receipts: ", paste(total_receipts), "\n")
+  cat("Shots for: ", paste(total_shots_for), "\n")
+  cat("xG for: ", paste(total_xg_for), "\n")
+  cat("Shots against: ", paste(total_shots_against), "\n")
+  cat("xG against: ", paste(total_xg_against), "\n")
+  
+  pitch_zones$receipts[rownum] = total_receipts
+  pitch_zones$xg_for[rownum] = total_xg_for
+  pitch_zones$xg_against[rownum]  = total_xg_against
+  pitch_zones$shots_for[rownum]  = total_shots_for
+  pitch_zones$shots_against[rownum] <-total_shots_against
+}
+
+```
+
+```{r}
+pitch_zones <- pitch_zones %>%
+  mutate(xg_diff = xg_for - xg_against, xg_diff_per_rec = (xg_for-xg_against)/receipts)
+```
+
+
+MAKE SURE TO WRITE CSV FOR PITCH_ZONES AS BACKUP!!!!!!
+
+```{r}
+write.csv(pitch_zones,"/Users/KIDS/Downloads/pitchzonesgplusFINAL.csv")
+```
+
+
+```{r}
+head(all_events_1516)
+```
+
+```{r}
+throwcols <- all_events_1516 %>%
+  select(id,index,period,under_pressure,off_camera,type.name,possession,possession_team.name,team.name,pass.length,pass.height.name,pass.type.name,pass.outcome.name,shot.statsbomb_xg,match_id,location.x,location.y,minsec,pass.end_location.x,pass.end_location.y, position.name, match_id,pass.type.name,player.name)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+throws_18 = 0
+
+shots_for_18 = 0
+xg_for_18 = 0
+
+shots_ag_18 = 0
+xg_ag_18 = 0
+
+for(i in 1:nrow(throwcols)) {
+  if(!is.na(throwcols$pass.type.name[i]) & !is.na(throwcols$location.x[i])) {
+    
+    if(throwcols$pass.type.name[i] == "Throw-in" & throwcols$location.x[i] < 18) { #if throw-in in own quarter
+    
+    throws_18 = throws_18 + 1
+    
+    newdf <- throwcols %>%
+      filter(match_id == throwcols$match_id[i] & minsec < throwcols$minsec[i] + 120 & possession %in% c(throwcols$possession[i], throwcols$possession[i] + 1)) #new df with events in same game in next 60 secs #can delete minsec if poss works
+    
+    for(q in 1:nrow(newdf)) {
+      if(!is.na(newdf$shot.statsbomb_xg[q])) { #if shot
+        if (newdf$team.name[q] == throwcols$team.name[i]) {
+          shots_for_18 = shots_for_18 + 1
+          xg_for_18 = xg_for_18 + newdf$shot.statsbomb_xg[q]
+        }
+        else{
+          shots_ag_18 = shots_ag_18 + 1
+          xg_ag_18 = xg_ag_18 + newdf$shot.statsbomb_xg[q]
+        }
+      }
+    }
+  }
+  if (i %% 10000 == 0) {
+    print(100*i/nrow(throwcols))
+  }
+
+  }
+}
+```
+
+```{r}
+kickoffs = 0
+
+shots_for_kos = 0
+xg_for_kos = 0
+
+shots_ag_kos = 0
+xg_ag_kos = 0
+
+for(i in 1:nrow(throwcols)) {
+  if(!is.na(throwcols$pass.type.name[i]) & !is.na(throwcols$location.x[i])) {
+    
+    if(throwcols$pass.type.name[i] == "Kick Off") { #if kickoff
+    
+    kickoffs = kickoffs + 1
+    
+    newdf <- throwcols %>%
+      filter(match_id == throwcols$match_id[i] & minsec < throwcols$minsec[i] + 120 & possession %in% c(throwcols$possession[i], throwcols$possession[i] + 1)) #new df with events in same game in next 60 secs #can delete minsec if poss works
+    
+    for(q in 1:nrow(newdf)) {
+      if(!is.na(newdf$shot.statsbomb_xg[q])) { #if shot
+        if (newdf$team.name[q] == throwcols$team.name[i]) {
+          shots_for_kos = shots_for_kos + 1
+          xg_for_kos = xg_for_kos + newdf$shot.statsbomb_xg[q]
+        }
+        else{
+          shots_ag_kos = shots_ag + 1
+          xg_ag_kos = xg_ag_kos + newdf$shot.statsbomb_xg[q]
+        }
+      }
+    }
+  }
+
+  }
+  if (i %% 100000 == 0) {
+    print(100*i/nrow(throwcols))
+  }
+}
+```
+
+
